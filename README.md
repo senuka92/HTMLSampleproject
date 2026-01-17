@@ -54,3 +54,4 @@ Gateway (REST): http://localhost:8081
 - Add the REST/BFF gateway with token management and service routing.
 
 See `docs/architecture.md` for the full blueprint.
+For the implementation checklist, see `docs/next-steps.md`.
