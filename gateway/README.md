@@ -11,6 +11,7 @@ Planned responsibilities:
 
 ## Local endpoints (initial)
 
+- `POST /auth/refresh`
 - `POST /banks`
 - `POST /cards`
 - `POST /statements`

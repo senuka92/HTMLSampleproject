@@ -55,3 +55,4 @@ Gateway (REST): http://localhost:8081
 
 See `docs/architecture.md` for the full blueprint.
 For the implementation checklist, see `docs/next-steps.md`.
+For deployment configuration, see `docs/deployment.md`.

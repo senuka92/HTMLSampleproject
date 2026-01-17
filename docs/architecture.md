@@ -17,6 +17,7 @@
 ## Event topics (NATS JetStream)
 
 - `card.created`
+- `bank.created`
 - `statement.created`
 - `payment.created`
 - `income.upserted`
@@ -37,6 +38,7 @@
 - `POST /payments`
 - `POST /alerts/schedule`
 - `GET /dashboard/summary`
+- `POST /auth/refresh`
 
 ## Internal API (gRPC)
 

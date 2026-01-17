@@ -8,6 +8,7 @@ import (
 	atomic "sync/atomic"
 	time "time"
 
+	events "github.com/example/pfm/pkg/events"
 	alertsv1 "github.com/example/pfm/services/alerts/gen"
 )
 
@@ -25,10 +26,12 @@ type Server struct {
 	alertsv1.UnimplementedAlertsServiceServer
 	alertsv1.UnimplementedDashboardServiceServer
 	store *Store
+	repo  *Repository
+	pubs  *events.Publisher
 }
 
-func NewServer(store *Store) *Server {
-	return &Server{store: store}
+func NewServer(store *Store, repo *Repository, pubs *events.Publisher) *Server {
+	return &Server{store: store, repo: repo, pubs: pubs}
 }
 
 func (s *Server) ScheduleAlert(ctx context.Context, req *alertsv1.ScheduleAlertRequest) (*alertsv1.Alert, error) {
@@ -46,10 +49,21 @@ func (s *Server) ScheduleAlert(ctx context.Context, req *alertsv1.ScheduleAlertR
 	s.store.mu.Lock()
 	s.store.alerts[alert.Id] = alert
 	s.store.mu.Unlock()
+	if s.repo != nil {
+		if err := s.repo.CreateAlert(ctx, alert); err != nil {
+			return nil, err
+		}
+	}
+	if s.pubs != nil {
+		_ = s.pubs.Publish(ctx, "alert.scheduled", alert)
+	}
 	return alert, nil
 }
 
 func (s *Server) GetSummary(ctx context.Context, req *alertsv1.GetSummaryRequest) (*alertsv1.DashboardSummary, error) {
+	if s.repo != nil {
+		return s.repo.Summary(ctx)
+	}
 	var totalDue float64
 	var overdueCount int32
 	now := time.Now()

@@ -7,6 +7,7 @@ import (
 	sync "sync"
 	atomic "sync/atomic"
 
+	events "github.com/example/pfm/pkg/events"
 	paymentsv1 "github.com/example/pfm/services/payments/gen"
 )
 
@@ -23,10 +24,12 @@ func NewStore() *Store {
 type Server struct {
 	paymentsv1.UnimplementedPaymentsServiceServer
 	store *Store
+	repo  *Repository
+	pubs  *events.Publisher
 }
 
-func NewServer(store *Store) *Server {
-	return &Server{store: store}
+func NewServer(store *Store, repo *Repository, pubs *events.Publisher) *Server {
+	return &Server{store: store, repo: repo, pubs: pubs}
 }
 
 func (s *Server) CreatePayment(ctx context.Context, req *paymentsv1.CreatePaymentRequest) (*paymentsv1.Payment, error) {
@@ -44,6 +47,14 @@ func (s *Server) CreatePayment(ctx context.Context, req *paymentsv1.CreatePaymen
 	s.store.mu.Lock()
 	s.store.payments[payment.Id] = payment
 	s.store.mu.Unlock()
+	if s.repo != nil {
+		if err := s.repo.CreatePayment(ctx, payment); err != nil {
+			return nil, err
+		}
+	}
+	if s.pubs != nil {
+		_ = s.pubs.Publish(ctx, "payment.created", payment)
+	}
 	return payment, nil
 }
 

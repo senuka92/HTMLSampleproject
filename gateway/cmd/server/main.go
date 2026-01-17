@@ -5,9 +5,12 @@ import (
 	encodingjson "encoding/json"
 	log "log"
 	nethttp "net/http"
+	url "net/url"
 	os "os"
+	strings "strings"
 	time "time"
 
+	auth "github.com/example/pfm/pkg/auth"
 	grpc "google.golang.org/grpc"
 	credentials "google.golang.org/grpc/credentials/insecure"
 
@@ -27,6 +30,7 @@ type server struct {
 	paymentsClient  paymentsv1.PaymentsServiceClient
 	alertsClient    alertsv1.AlertsServiceClient
 	dashboardClient alertsv1.DashboardServiceClient
+	authValidator   *auth.Validator
 }
 
 func main() {
@@ -43,15 +47,23 @@ func main() {
 		alertsClient:    alertsv1.NewAlertsServiceClient(alertsConn),
 		dashboardClient: alertsv1.NewDashboardServiceClient(alertsConn),
 	}
+	if envOrDefault("AUTH_REQUIRED", "false") == "true" {
+		validator, err := auth.NewValidator(context.Background(), envOrDefault("KEYCLOAK_JWKS_URL", ""))
+		if err != nil {
+			log.Fatalf("auth validator: %v", err)
+		}
+		svc.authValidator = validator
+	}
 
 	mux := nethttp.NewServeMux()
 	mux.HandleFunc("/healthz", svc.handleHealth)
-	mux.HandleFunc("/banks", svc.handleCreateBank)
-	mux.HandleFunc("/cards", svc.handleCreateCard)
-	mux.HandleFunc("/statements", svc.handleCreateStatement)
-	mux.HandleFunc("/payments", svc.handleCreatePayment)
-	mux.HandleFunc("/alerts/schedule", svc.handleScheduleAlert)
-	mux.HandleFunc("/dashboard/summary", svc.handleSummary)
+	mux.HandleFunc("/auth/refresh", svc.handleRefresh)
+	mux.HandleFunc("/banks", svc.authRequired(svc.handleCreateBank))
+	mux.HandleFunc("/cards", svc.authRequired(svc.handleCreateCard))
+	mux.HandleFunc("/statements", svc.authRequired(svc.handleCreateStatement))
+	mux.HandleFunc("/payments", svc.authRequired(svc.handleCreatePayment))
+	mux.HandleFunc("/alerts/schedule", svc.authRequired(svc.handleScheduleAlert))
+	mux.HandleFunc("/dashboard/summary", svc.authRequired(svc.handleSummary))
 
 	addr := envOrDefault("GATEWAY_ADDR", ":8081")
 	log.Printf("gateway listening on %s", addr)
@@ -70,6 +82,73 @@ func dialGRPC(addr string) *grpc.ClientConn {
 
 func (s *server) handleHealth(w nethttp.ResponseWriter, r *nethttp.Request) {
 	writeJSON(w, nethttp.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *server) authRequired(next nethttp.HandlerFunc) nethttp.HandlerFunc {
+	return func(w nethttp.ResponseWriter, r *nethttp.Request) {
+		if s.authValidator == nil {
+			next(w, r)
+			return
+		}
+		if _, err := s.authValidator.ValidateRequest(r); err != nil {
+			writeError(w, nethttp.StatusUnauthorized, "unauthorized")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (s *server) handleRefresh(w nethttp.ResponseWriter, r *nethttp.Request) {
+	if r.Method != nethttp.MethodPost {
+		writeError(w, nethttp.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	var payload struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := decodeJSON(r, &payload); err != nil {
+		writeError(w, nethttp.StatusBadRequest, err.Error())
+		return
+	}
+	tokenURL := envOrDefault("KEYCLOAK_TOKEN_URL", "")
+	clientID := envOrDefault("KEYCLOAK_CLIENT_ID", "")
+	clientSecret := envOrDefault("KEYCLOAK_CLIENT_SECRET", "")
+	if tokenURL == "" || clientID == "" {
+		writeError(w, nethttp.StatusBadRequest, "missing keycloak configuration")
+		return
+	}
+
+	form := url.Values{}
+	form.Set("grant_type", "refresh_token")
+	form.Set("refresh_token", payload.RefreshToken)
+	form.Set("client_id", clientID)
+	if clientSecret != "" {
+		form.Set("client_secret", clientSecret)
+	}
+
+	req, err := nethttp.NewRequestWithContext(r.Context(), nethttp.MethodPost, tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		writeError(w, nethttp.StatusInternalServerError, err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := nethttp.DefaultClient.Do(req)
+	if err != nil {
+		writeError(w, nethttp.StatusBadGateway, err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		writeError(w, resp.StatusCode, "token refresh failed")
+		return
+	}
+	var result map[string]interface{}
+	if err := encodingjson.NewDecoder(resp.Body).Decode(&result); err != nil {
+		writeError(w, nethttp.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, nethttp.StatusOK, result)
 }
 
 func (s *server) handleCreateBank(w nethttp.ResponseWriter, r *nethttp.Request) {

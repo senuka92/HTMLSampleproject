@@ -7,6 +7,7 @@ import (
 	sync "sync"
 	atomic "sync/atomic"
 
+	events "github.com/example/pfm/pkg/events"
 	incomev1 "github.com/example/pfm/services/income/gen"
 )
 
@@ -23,10 +24,12 @@ func NewStore() *Store {
 type Server struct {
 	incomev1.UnimplementedIncomeServiceServer
 	store *Store
+	repo  *Repository
+	pubs  *events.Publisher
 }
 
-func NewServer(store *Store) *Server {
-	return &Server{store: store}
+func NewServer(store *Store, repo *Repository, pubs *events.Publisher) *Server {
+	return &Server{store: store, repo: repo, pubs: pubs}
 }
 
 func (s *Server) UpsertIncome(ctx context.Context, req *incomev1.UpsertIncomeRequest) (*incomev1.Income, error) {
@@ -44,6 +47,14 @@ func (s *Server) UpsertIncome(ctx context.Context, req *incomev1.UpsertIncomeReq
 	s.store.mu.Lock()
 	s.store.incomes[income.Id] = income
 	s.store.mu.Unlock()
+	if s.repo != nil {
+		if err := s.repo.UpsertIncome(ctx, income); err != nil {
+			return nil, err
+		}
+	}
+	if s.pubs != nil {
+		_ = s.pubs.Publish(ctx, "income.upserted", income)
+	}
 	return income, nil
 }
 

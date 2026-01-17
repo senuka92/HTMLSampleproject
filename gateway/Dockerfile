@@ -1,6 +1,7 @@
 FROM golang:1.22-alpine AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
+COPY pkg ./pkg
 COPY gateway ./gateway
 COPY services/alerts/gen ./services/alerts/gen
 COPY services/cards/gen ./services/cards/gen

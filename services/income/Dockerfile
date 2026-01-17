@@ -1,6 +1,7 @@
 FROM golang:1.22-alpine AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
+COPY pkg ./pkg
 COPY services/income ./services/income
 COPY services/income/gen ./services/income/gen
 RUN go build -o /bin/income ./services/income/cmd/server

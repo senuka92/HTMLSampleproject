@@ -12,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pfm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   nats:
     image: nats:2.10
@@ -38,6 +43,8 @@ services:
     container_name: pfm-cards
     environment:
       CARDS_GRPC_ADDR: ":50051"
+      CARDS_DATABASE_URL: "postgres://pfm:pfm@postgres:5432/pfm?sslmode=disable"
+      NATS_URL: "nats://nats:4222"
     ports:
       - "50051:50051"
     depends_on:
@@ -50,6 +57,8 @@ services:
     container_name: pfm-payments
     environment:
       PAYMENTS_GRPC_ADDR: ":50052"
+      PAYMENTS_DATABASE_URL: "postgres://pfm:pfm@postgres:5432/pfm?sslmode=disable"
+      NATS_URL: "nats://nats:4222"
     ports:
       - "50052:50052"
     depends_on:
@@ -62,6 +71,8 @@ services:
     container_name: pfm-income
     environment:
       INCOME_GRPC_ADDR: ":50053"
+      INCOME_DATABASE_URL: "postgres://pfm:pfm@postgres:5432/pfm?sslmode=disable"
+      NATS_URL: "nats://nats:4222"
     ports:
       - "50053:50053"
     depends_on:
@@ -74,6 +85,8 @@ services:
     container_name: pfm-alerts
     environment:
       ALERTS_GRPC_ADDR: ":50054"
+      ALERTS_DATABASE_URL: "postgres://pfm:pfm@postgres:5432/pfm?sslmode=disable"
+      NATS_URL: "nats://nats:4222"
     ports:
       - "50054:50054"
     depends_on:
@@ -86,6 +99,7 @@ services:
     container_name: pfm-gateway
     environment:
       GATEWAY_ADDR: ":8081"
+      AUTH_REQUIRED: "false"
       CARDS_GRPC_ADDR: "cards:50051"
       PAYMENTS_GRPC_ADDR: "payments:50052"
       ALERTS_GRPC_ADDR: "alerts:50054"
