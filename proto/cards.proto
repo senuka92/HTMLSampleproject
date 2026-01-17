@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package cards.v1;
+
+option go_package = "github.com/example/pfm/services/cards/gen;cardsv1";
+
+service CardsService {
+  rpc CreateBank(CreateBankRequest) returns (Bank);
+  rpc CreateCard(CreateCardRequest) returns (Card);
+  rpc CreateStatement(CreateStatementRequest) returns (Statement);
+}
+
+message CreateBankRequest {
+  string name = 1;
+}
+
+message CreateCardRequest {
+  string bank_id = 1;
+  string name = 2;
+  string last_four = 3;
+  string due_day = 4;
+}
+
+message CreateStatementRequest {
+  string card_id = 1;
+  string statement_month = 2;
+  string due_date = 3;
+  double due_amount = 4;
+}
+
+message Bank {
+  string id = 1;
+  string name = 2;
+}
+
+message Card {
+  string id = 1;
+  string bank_id = 2;
+  string name = 3;
+  string last_four = 4;
+  string due_day = 5;
+}
+
+message Statement {
+  string id = 1;
+  string card_id = 2;
+  string statement_month = 3;
+  string due_date = 4;
+  double due_amount = 5;
+}

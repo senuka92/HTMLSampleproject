@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package income.v1;
+
+option go_package = "github.com/example/pfm/services/income/gen;incomev1";
+
+service IncomeService {
+  rpc UpsertIncome(UpsertIncomeRequest) returns (Income);
+}
+
+message UpsertIncomeRequest {
+  string month = 1;
+  string currency = 2;
+  double amount = 3;
+  string source = 4;
+  string note = 5;
+}
+
+message Income {
+  string id = 1;
+  string month = 2;
+  string currency = 3;
+  double amount = 4;
+  string source = 5;
+  string note = 6;
+}
