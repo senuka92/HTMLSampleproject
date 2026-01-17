@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package alerts.v1;
+
+option go_package = "github.com/example/pfm/services/alerts/gen;alertsv1";
+
+service AlertsService {
+  rpc ScheduleAlert(ScheduleAlertRequest) returns (Alert);
+}
+
+service DashboardService {
+  rpc GetSummary(GetSummaryRequest) returns (DashboardSummary);
+}
+
+message ScheduleAlertRequest {
+  string card_id = 1;
+  string statement_id = 2;
+  string due_date = 3;
+  double due_amount = 4;
+}
+
+message Alert {
+  string id = 1;
+  string card_id = 2;
+  string statement_id = 3;
+  string due_date = 4;
+  double due_amount = 5;
+  string status = 6;
+}
+
+message GetSummaryRequest {}
+
+message DashboardSummary {
+  double total_due = 1;
+  double total_paid = 2;
+  double total_remaining = 3;
+  int32 overdue_count = 4;
+}

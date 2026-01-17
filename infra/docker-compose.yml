@@ -1,0 +1,100 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pfm-postgres
+    environment:
+      POSTGRES_USER: pfm
+      POSTGRES_PASSWORD: pfm
+      POSTGRES_DB: pfm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  nats:
+    image: nats:2.10
+    container_name: pfm-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.4
+    container_name: pfm-keycloak
+    command: ["start-dev"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+
+  cards:
+    build:
+      context: ..
+      dockerfile: services/cards/Dockerfile
+    container_name: pfm-cards
+    environment:
+      CARDS_GRPC_ADDR: ":50051"
+    ports:
+      - "50051:50051"
+    depends_on:
+      - postgres
+
+  payments:
+    build:
+      context: ..
+      dockerfile: services/payments/Dockerfile
+    container_name: pfm-payments
+    environment:
+      PAYMENTS_GRPC_ADDR: ":50052"
+    ports:
+      - "50052:50052"
+    depends_on:
+      - postgres
+
+  income:
+    build:
+      context: ..
+      dockerfile: services/income/Dockerfile
+    container_name: pfm-income
+    environment:
+      INCOME_GRPC_ADDR: ":50053"
+    ports:
+      - "50053:50053"
+    depends_on:
+      - postgres
+
+  alerts:
+    build:
+      context: ..
+      dockerfile: services/alerts/Dockerfile
+    container_name: pfm-alerts
+    environment:
+      ALERTS_GRPC_ADDR: ":50054"
+    ports:
+      - "50054:50054"
+    depends_on:
+      - postgres
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile
+    container_name: pfm-gateway
+    environment:
+      GATEWAY_ADDR: ":8081"
+      CARDS_GRPC_ADDR: "cards:50051"
+      PAYMENTS_GRPC_ADDR: "payments:50052"
+      ALERTS_GRPC_ADDR: "alerts:50054"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - cards
+      - payments
+      - alerts
+
+volumes:
+  postgres_data:

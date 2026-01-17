@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package payments.v1;
+
+option go_package = "github.com/example/pfm/services/payments/gen;paymentsv1";
+
+service PaymentsService {
+  rpc CreatePayment(CreatePaymentRequest) returns (Payment);
+}
+
+message CreatePaymentRequest {
+  string card_id = 1;
+  string statement_id = 2;
+  double amount = 3;
+  string paid_at = 4;
+  string note = 5;
+}
+
+message Payment {
+  string id = 1;
+  string card_id = 2;
+  string statement_id = 3;
+  double amount = 4;
+  string paid_at = 5;
+  string note = 6;
+}
